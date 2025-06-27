@@ -41,6 +41,7 @@ from settings import (
     HIST_LEN,
     HISTORY_FRESH_SEC,
     Z_THRESHOLD,
+    REST_SYNC_ENABLED,
 )
 from db.sqlite import DB
 from core import prices as pr
@@ -132,8 +133,10 @@ async def _tick(
     db: DB = app.bot_data["db"]
 
     # 1) довантажуємо хвости, якщо не йде бек-філ
-    await sync_prices_for_pairs(db)
-
+    if REST_SYNC_ENABLED:
+        await sync_prices_for_pairs(db)
+    else:
+        log.debug("REST-sync вимкнено – покладаємось на WebSocket")
     # 2) рахуємо Z-score
     t0 = perf_counter()
     pairs = [(a, b) async for a, b in db.iter_pairs()]
