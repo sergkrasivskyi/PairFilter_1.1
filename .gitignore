@@ -1,3 +1,22 @@
+# ───── Секрети та приватні налаштування ─────────────────────
 .env
+
+# ───── Логи ─────────────────────────────────────────────────
 bot.log
-__pycache__
+*.log
+
+# ───── SQLite і його WAL/JOURNAL файли ─────────────────────
+pairfilter.db
+pairfilter.db-shm
+pairfilter.db-wal
+
+# ───── Python bytecode / кеші ───────────────────────────────
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+
+# ───── Інструментальні кеші (опційно) ───────────────────────
+.mypy_cache/
+.pytest_cache/
+.ipynb_checkpoints/
