@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from time import perf_counter
 from typing import TYPE_CHECKING
 
@@ -145,7 +146,14 @@ async def _tick(
     for sym_a, sym_b in pairs:
         a_ser = await db.get_series(sym_a, HIST_LEN)
         b_ser = await db.get_series(sym_b, HIST_LEN)
-        if len(a_ser) < HIST_LEN or len(b_ser) < HIST_LEN:
+        # ── умова «повна + свіжа історія» ──
+        now_aligned = (int(time.time()) // 900) * 900
+        if (
+            len(a_ser) < HIST_LEN
+            or len(b_ser) < HIST_LEN
+            or now_aligned - a_ser[-1][0] > HISTORY_FRESH_SEC
+            or now_aligned - b_ser[-1][0] > HISTORY_FRESH_SEC
+        ):
             log.info(
                 "z-calc  %s/%s  skip (history %s/%s)",
                 sym_a,

@@ -1,1 +1,9 @@
-ws only
+2025-06-27 20:02:46,495 [INFO] pairfilter: Логер ініціалізовано
+2025-06-27 20:02:47,714 [INFO] pairfilter: Handlers зареєстровані
+2025-06-27 20:02:48,188 [INFO] apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-06-27 20:02:48,188 [INFO] apscheduler.scheduler: Added job "_tick" to job store "default"
+2025-06-27 20:02:48,188 [INFO] apscheduler.scheduler: Scheduler started
+2025-06-27 20:02:48,189 [INFO] pairfilter: Scheduler запущено (0/15/30/45 хв)
+2025-06-27 20:02:48,190 [INFO] pairfilter: post_init завершено: БД + планувальник готові
+2025-06-27 20:02:48,327 [INFO] apscheduler.scheduler: Scheduler started
+2025-06-27 20:02:49,391 [INFO] pairfilter.ws: WS-підключення відкрите

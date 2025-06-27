@@ -41,8 +41,10 @@ async def _handle_msg(msg: dict[str, Any], db: DB) -> None:
 
     if pr.history_refreshing:
         pr.pending_rows.append(row)
+        log.debug("%s WS-буфер (бек-філ)", symbol)
     else:
         await db.save_prices([row])
+        log.info("WS-свічка %s  ts=%s  close=%s", symbol, ts_sec, close)
 
 async def start_listener(db: DB) -> None:
     """Запускається один раз з scheduler.setup(). Не завершується."""

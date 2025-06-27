@@ -20,7 +20,11 @@ from typing import List, Tuple
 
 import httpx
 
-from settings import BINANCE_URL, HIST_LEN
+from settings import (
+  BINANCE_URL,
+  HIST_LEN,
+  HISTORY_FRESH_SEC,
+)
 from db.sqlite import DB
 
 # ────────────────────────────────────────────────────────────
@@ -114,6 +118,12 @@ async def sync_prices_for_pairs(db: DB, *, concurrency: int = 8) -> None:
                 log.warning("%s – порожня відповідь, позначено inactive", sym)
                 return
             rows = [(sym, int(k[0] // 1000), float(k[4])) for k in klines]
+            # якщо остання свічка старіша > HISTORY_FRESH_SEC → symbol «мертвий»
+            now_aligned = (int(time.time()) // 900) * 900
+            if now_aligned - rows[-1][1] > HISTORY_FRESH_SEC:
+                await db.mark_inactive(sym)
+                log.warning("%s – занадто стара історія, позначено inactive", sym)
+                return
             await db.save_prices(rows)
             log.info("%s — у БД %s, бракує %s, завантажено %s", sym, have, missing, len(rows))
 

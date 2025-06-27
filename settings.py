@@ -52,4 +52,4 @@ HISTORY_FRESH_SEC: int = int(os.getenv("HISTORY_FRESH_SEC", 20 * 60))
 # HTTP-timeout, використовується у сцені «Парсинг пар»
 TIMEOUT_SEC: int = 30
 # True → REST + WebSocet; False → тільки WebSocket
-REST_SYNC_ENABLED = False        
+REST_SYNC_ENABLED = True        
