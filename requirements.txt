@@ -1,0 +1,6 @@
+python-telegram-bot==21.*
+aiosqlite
+httpx
+apscheduler
+python-dotenv 
+numpy
