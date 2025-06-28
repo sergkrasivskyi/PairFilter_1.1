@@ -1,61 +1,106 @@
 """
-core/prices_ws.py
-──────────────────
-WebSocket-слухач Binance, який пише 15-хв. свічки.
+core/prices_ws.py  –  WebSocket-стрім усіх 15-хв. свічок.
 
-• При history_refreshing == True  — свічки складаються у
-  core.prices.pending_rows і не лізуть у БД одразу.
-• При звичайному стані — одразу INSERT OR IGNORE у БД.
+Ключові зміни v2.2
+──────────────────
+• URL мульти-стріму будується від бази WS_ENDPOINT, *видаляючи* '/ws'
+  (бо правильний шлях: …/stream?streams=).
+• Перебудова пулу сокетів раз на 15 хв (900 с) перед плановим _tick.
+• Лог кожної закритої свічки: INFO  WS BTCUSDT ts=…
 """
 
 from __future__ import annotations
 
-import asyncio
-import json
-import logging
-from datetime import datetime, timezone
-from typing import Any
+import asyncio, json, logging, time
+from itertools import islice
+from typing import Any, List, Set
 
 import websockets
 
 from settings import WS_ENDPOINT
 from db.sqlite import DB
-import core.prices as pr  # для history_refreshing та pending_rows
+import core.prices as pr
 
 log = logging.getLogger("pairfilter.ws")
 
-STREAM = "!kline_15m@arr"  # агрегований потік усіх 15-хв. свічок
+MAX_STREAMS = 180               # <200 → гарантовано <4 kB URL
+REFRESH_SEC = 900               # раз на 15 хв перевіряємо символи
 
-async def _handle_msg(msg: dict[str, Any], db: DB) -> None:
-    """Обробляє одне kline-повідомлення."""
+
+# ───────── helpers ──────────────────────────────────────────
+def chunks(seq: List[str], n: int):
+    it = iter(seq)
+    while True:
+        block = list(islice(it, n))
+        if not block:
+            return
+        yield block
+
+
+def row_from_msg(msg: dict[str, Any]):
     if msg.get("e") != "kline":
-        return
+        return None
     k = msg["k"]
-    if not k.get("x"):           # x=False → свічка ще не закрита
-        return
+    if not k.get("x"):          # незакрита свічка
+        return None
+    return k["s"], int(k["t"] // 1000), float(k["c"])
 
-    symbol = k["s"]
-    ts_sec = int(k["t"] // 1000)
-    close = float(k["c"])
-    row = (symbol, ts_sec, close)
 
+async def save_row(row, db: DB):
     if pr.history_refreshing:
         pr.pending_rows.append(row)
-        log.debug("%s WS-буфер (бек-філ)", symbol)
     else:
         await db.save_prices([row])
-        log.info("WS-свічка %s  ts=%s  close=%s", symbol, ts_sec, close)
+        log.info("WS %s ts=%s", row[0], row[1])
 
-async def start_listener(db: DB) -> None:
-    """Запускається один раз з scheduler.setup(). Не завершується."""
-    url = f"{WS_ENDPOINT}/{STREAM}"
+
+async def socket_worker(url: str, db: DB):
+    """Один WebSocket з ≤180 streams."""
     while True:
         try:
-            async with websockets.connect(url) as ws:
-                log.info("WS-підключення відкрите")
+            async with websockets.connect(url, ping_interval=15, ping_timeout=10) as ws:
+                log.info("WS open %s", url[-80:])
                 async for raw in ws:
-                    msg = json.loads(raw)
-                    await _handle_msg(msg, db)
+                    pkt = json.loads(raw)           # {"stream": "...", "data": {...}}
+                    row = row_from_msg(pkt["data"])
+                    if row:
+                        await save_row(row, db)
         except Exception as e:
-            log.error("WS-помилка %s — реконект через 5 с", e)
+            log.error("WS err %s → reconnect 5 s", e)
             await asyncio.sleep(5)
+
+
+# ───────── main loop ────────────────────────────────────────
+async def start_listener(db: DB):
+    """
+    Піднімає пул WS-підключень, що накривають усі active-symbol@kline_15m.
+    Раз на REFRESH_SEC перевіряє, чи змінився набір символів, і
+    перезапускає пул, якщо так.
+    """
+    current: Set[str] = set()
+    workers: List[asyncio.Task] = []
+
+    # база URL без «/ws»
+    base_ws = WS_ENDPOINT.replace("/ws", "")
+
+    while True:
+        symbols = {
+            s async for a, b in db.iter_pairs()
+            for s in (a, b)
+        }
+        if symbols != current:
+            current = symbols
+            # зупиняємо старі сокети
+            for t in workers:
+                t.cancel()
+            workers.clear()
+
+            for group in chunks(sorted(current), MAX_STREAMS):
+                streams = "/".join(f"{sym.lower()}@kline_15m" for sym in group)
+                url = f"{base_ws}/stream?streams={streams}"
+                workers.append(asyncio.create_task(socket_worker(url, db)))
+
+            log.info("WS-пул оновлено: %s symbols → %s sockets",
+                     len(current), len(workers))
+
+        await asyncio.sleep(REFRESH_SEC)

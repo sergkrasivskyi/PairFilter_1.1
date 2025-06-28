@@ -32,7 +32,7 @@ FULL_REFRESH_CONFIRM_CHAT_ID: int = int(
 # ────────────────────────────────────────────────────────────
 BINANCE_URL: str = os.getenv("BINANCE_URL", "https://api.binance.com")
 WS_ENDPOINT: str = os.getenv(
-    "WS_ENDPOINT", "wss://stream.binance.com:9443/ws"
+    "WS_ENDPOINT", "wss://stream.binance.com:9443"
 )
 
 # ────────────────────────────────────────────────────────────
@@ -52,4 +52,4 @@ HISTORY_FRESH_SEC: int = int(os.getenv("HISTORY_FRESH_SEC", 20 * 60))
 # HTTP-timeout, використовується у сцені «Парсинг пар»
 TIMEOUT_SEC: int = 30
 # True → REST + WebSocet; False → тільки WebSocket
-REST_SYNC_ENABLED = True        
+REST_SYNC_ENABLED = False        
